@@ -49,5 +49,3 @@ Bibtex formatted reference:
 ------------------
 ## Acknowledgements
 This work was funded by NIH Grants R01GM048661 (to E.L.F.H.) and F30NS092227 (to J.J.N.). This study has received support under the program “Investissements d’Avenir” launched by the French Government and implemented by ANR with the references ANR-10-LBX-0038, ANR-10-IDEX-0001-02 PSL. The work of M.M. is supported by the Fondation pour la Recherche Medicale (FRM) grant DEQ20170336756 and the the Fondation Vaincre Alzheimer grant FR-16055p. P.G-D. was supported by the NSF Science and Technology Center for Engineering MechanoBiology (Grant CMMI-1548571).
-
-The content is solely the responsibility of the authors and does not represent the official views of the National Institutes of Health or the NVIDIA corporation. The funders had no role in software development for Cell DECODER, study design, data collection and analysis, decision to publish, or preparation of this manuscript.

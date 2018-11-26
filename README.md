@@ -6,9 +6,9 @@
 ## Contents
 * [Installation](#installation)
 * [Files](#files)
-** [ensembleRecruitment](ensembleRecruitment): A script to segment microtubules and quantify fluorescence intensity of objects on microtubules vs. background to measure microtubule binding in TIRF microscopy.
-** [kymoSuite](kymoSuite): A set of MALTAB (R) functions with GUI for manual kymograph tracing of motility events and semi-automated analysis.
-** [nearestPresynapticDistance](nearestPresynapticDistance): A script to measure the observed nearest neighbor distance from one set of *n* points (e.g., EB3 comet initiation/ termination) to a set of reference *p* points (e.g., presynapses) along a 1-dimensional line *l*. For each set of observations, it performs a Monte Carlo simulation of *n* points distributed with a uniform random probability along *l* and computes the nearest neighbor distance to a fixed reference set *p*.
+	* [ensembleRecruitment](ensembleRecruitment): A script to segment microtubules and quantify fluorescence intensity of objects on microtubules vs. background to measure microtubule binding in TIRF microscopy.
+	* [kymoSuite](kymoSuite): A set of MALTAB (R) functions with GUI for manual kymograph tracing of motility events and semi-automated analysis.
+	* [nearestPresynapticDistance](nearestPresynapticDistance): A script to measure the observed nearest neighbor distance from one set of *n* points (e.g., EB3 comet initiation/ termination) to a set of reference *p* points (e.g., presynapses) along a 1-dimensional line *l*. For each set of observations, it performs a Monte Carlo simulation of *n* points distributed with a uniform random probability along *l* and computes the nearest neighbor distance to a fixed reference set *p*.
 * [License and citation](#license-and-citation)
 * [Acknowledgements](#acknowledgements)
 

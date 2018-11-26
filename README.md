@@ -1,6 +1,6 @@
 # Supplemental code for "Kinesin-3 responds to local microtubule dynamics to target synaptic cargo delivery to the presynapse"
 
-[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](TODO--add_url/blob/master/LICENSE) [![DOI](https://zenodo.org/badge/doi/00.0000/zenodo.00000.svg)](http://dx.doi.org/00.0000/zenodo.00000)
+[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](TODO--add_url/blob/master/LICENSE) [![DOI](https://zenodo.org/badge/doi/00.0000/zenodo.00000.svg)](http://dx.doi.org/00.0000/guedesdias.00000)
 
 ------------------
 ## Contents
@@ -26,7 +26,7 @@ These scripts use the MATLAB (R) programming language and environment. To begin 
 **Minimal system requirements for using these scripts.** This does not include hard-drive space required for additional software packages or dependencies.
 
 ### Dependencies
-The following MATLAB (R) Toolboxes are required: Image Processing Toolbox, Statistics and Machine Learning Toolbox, and Signal Processing Toolbox. Additional dependencies include [uTrack - Danuser lab](https://www.utsouthwestern.edu/labs/danuser/software/#utrack_anc), [Bioformats](https://docs.openmicroscopy.org/bio-formats/5.9.2/users/matlab/), and MATLAB Central files where listed.
+The following MATLAB (R) Toolboxes are required: Image Processing Toolbox, Statistics and Machine Learning Toolbox, and Signal Processing Toolbox. Additional dependencies include [uTrack (Danuser lab)](https://www.utsouthwestern.edu/labs/danuser/software/#utrack_anc), [Bioformats](https://docs.openmicroscopy.org/bio-formats/5.9.2/users/matlab/), and MATLAB Central files where listed.
 
 
 ------------------

@@ -1,0 +1,711 @@
+function ensembleRecruitment_TIRF(varargin)
+% ensembleRecruitment_TIRF
+% Analysis microtubule intensity for ensemble microtubule recruitment
+% assays in TIRF microscopy.
+% 
+% See the source code for details on the processing steps in this function.
+%
+% Author: Jeffrey J. Nirschl
+%         Holzbaur Lab (University of Pennsylvania)
+% Date created: 07/10/2017
+% Distributable under BSD licence. 
+% Copyright (c) 2017 Jeffrey J. Nirschl
+% All rights reserved.
+% Last modified: 07/10/2017
+
+% Covered under a BSD license
+% Copyright (c) 2017 Jeffrey J. Nirschl
+% All rights reserved.
+% 
+% Redistribution and use in source and binary forms, with or without
+% modification, are permitted provided that the following conditions are
+% met:
+% 
+%     * Redistributions of source code must retain the above copyright
+%       notice, this list of conditions and the following disclaimer.
+%     * Redistributions in binary form must reproduce the above copyright
+%       notice, this list of conditions and the following disclaimer in
+%       the documentation and/or other materials provided with the distribution
+% 
+% THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+% AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+% IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+% ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+% LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+% CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+% SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, IM, OR PROFITS; OR BUSINESS
+% INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+% CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+% ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+% POSSIBILITY OF SUCH DAMAGE.
+
+% Input checking
+low_in = 0; high_in= inf; % Set range of acceptable input arguments
+low_out = 0; high_out= 1; % Set range of acceptable output arguments
+narginchk(low_in,high_in);
+nargoutchk(low_out,high_out);
+clear low_in high_in low_out high_out;
+
+% Parse input and check for errors
+[p]         = errorCheck(varargin{:});
+
+% Get the main directory for a single condition
+MainPath        = p.MAIN_PATH;
+SaveDir         = p.SAVE_PATH;
+
+% Create SaveDir if it does not exist
+if ~(exist(SaveDir,'dir')==7)
+    [~, ~, ~]   = mkdir([MainPath filesep 'Composite'],'Analysis');
+end
+
+% Get a list of the subfolders
+FolderList      = dirList(MainPath);
+FolderList      = FolderList(~strcmpi({FolderList.name},'Composite'));
+FileType        = p.FILE_TYPE; 
+
+% Set variables
+Train           = p.TRAIN;         % Set to true for manual training of MT segmentation model
+SaveImage       = p.SAVE_IMAGE;    % FLAG for saving images
+scoreSVMModel   = p.SVM.scoreSVMModel; % SVM classifier to remove abnormal microtubules
+regPropText     = p.REG_PROPS;     % Region props for SVM classifier
+BkgdColor       = p.BKGD_COLOR;    % Color for plotting the background 95% CI
+ThreshMethod    = p.THRESH_METHOD; % Method for thresholding microtubules
+PROPS           = p.MEASURE;       % Region props to measure for each microtubule
+filesepIdx      = strfind(MainPath,'/')+1; 
+
+% Variables for making ternary image
+Mag_cmap        = pk_cmap('L16'); % Magenta uniform colormap
+Gr_cmap         = pk_cmap('L17'); % Green uniform colormap
+Bl_cmap         = pk_cmap('L15'); % Red uniform colormap --may need to adjust for magenta-green
+hist_sat        = p.HIST_SAT;
+
+% Allocate empty vars
+tax = cell(0);
+gmp = cell(0);
+TMR = cell(0);
+
+% load all images in all subfolders
+for i1 = 1:numel(FolderList)
+    % load all images in the subfolders TMR, tax, gmp
+    temp_TMR = imageLoad('PATH',[MainPath filesep FolderList(i1).name],...
+        'Sel',1,'Ext', '.tif','legacy',true); % Selection 1 = TMR, 2 = gmp, 3 = tax
+    temp_gmp = imageLoad('PATH',[MainPath filesep FolderList(i1).name],...
+        'Sel',2,'Ext', FileType,'FilterSpec','Probabilities', 'Index',1,'legacy',true); % Selection 1 = TMR, 2 = gmp, 3 = tax 
+    temp_tax = imageLoad('PATH',[MainPath filesep FolderList(i1).name],...
+        'Sel',3,'Ext', FileType, 'FilterSpec','Probabilities', 'Index',1,'legacy',true); % Selection 1 = TMR, 2 = gmp, 3 = tax 
+    
+    % vertically concatenate the loaded images from each subfolder
+    TMR = [TMR; temp_TMR];
+    gmp = [gmp; temp_gmp];
+    tax = [tax; temp_tax];
+    
+    if i1 == 1
+        imSize  = numel(temp_TMR{1,2}); % Total number of pixels in the image.
+    end
+end
+clear temp_TMR temp_gmp temp_tax i1 % clear temp vars
+
+% error check
+if ~and(isequal(size(TMR,1),size(gmp,1)), isequal(size(TMR,1),size(tax,1)))
+    error('There are an unequal number of channels for an image!')
+end
+
+% normalize the TMR channel for to the max intensity for all images
+% TMR Col5 is normalized int. image
+maxData     = max(cellfun(@(x) max(max(x)), TMR(:,2),'unif',true'));
+
+% Create save directories
+if ~(exist(fullfile(SaveDir,'gfp_gray'),'dir')==7)
+    mkdir(SaveDir, 'gfp_gray')
+end
+
+if ~(exist(fullfile(SaveDir,'tax_gray'),'dir')==7)
+    mkdir(SaveDir, 'tax_gray')
+end
+
+if ~(exist(fullfile(SaveDir,'gmp_gray'),'dir')==7)
+    mkdir(SaveDir, 'gmp_gray')
+end
+
+% Filter TMR with rolling ball struct element
+roll_ball_SE = strel('ball',30,7.5);
+W = fspecial('gaussian',[5,5],2); % low-pass gaussian filter to remove high frequency noise
+for j1 = 1:size(TMR,1)
+    % Convert to double and normalize [0,1]
+    TMR{j1,2} = mat2gray(TMR{j1,2},[0,65535]);
+    
+    % Low-pass filter to remove high frequency noise.
+    % NOTE: It was important to filter AND THEN convert to double and
+    % normalize the the same range. Normalizing 0-1 and then filtering and
+    % then re-normalizing caused median backgound TMR levels to be
+    % significantly different.
+    TMR{j1,5} = imfilter(TMR{j1,2},W, 'symmetric'); 
+
+    % Get MinMax
+    minData = min(TMR{j1,2}(:));
+    maxData = max(TMR{j1,2}(:));
+
+    TMR{j1,5} = normData(TMR{j1,5},'Method','linear_unit_range','Array',true,...);
+        'SetMinMax',[minData, maxData]);
+    if SaveImage
+        % Save RGB and grayscale version of TMR image
+        rgb_filepath    = fullfile(SaveDir, 'gfp_gray', ['TMR_RGB_' tax{j1,1}(1:end-4) '_RGB.tiff']);
+        rgb = pk_applycolourmap(pk_histtruncate(TMR{j1,5},hist_sat),pk_cmap('L17'));
+            imwrite(rgb, rgb_filepath, 'tiff');
+
+        gray_filepath    = fullfile(SaveDir, 'gfp_gray', ['gfp_' tax{j1,1}(1:end-4) '_gray.tiff']);
+        TMR_rgb = pk_applycolourmap(pk_histtruncate(TMR{j1,5},hist_sat),pk_cmap('L1'));
+            imwrite(TMR_rgb, gray_filepath, 'tiff');
+    end
+end
+
+% Make ternary image (Magenta, Green, Red);
+cd(SaveDir)
+CompIm  = cell(size(tax,1));
+for j2 = 1:size(tax,1)
+    % Filter and normalize tax
+    tax{j2,2} = mat2gray(tax{j2,2}(:,:,1),[0,65535]);
+    tax{j2,5} = imfilter(invertContrast(tax{j2,2}),W, 'symmetric'); % low-pass filter to remove high frequency noise
+    if false%SaveImage
+        tax{j2,5} = imtophat(tax{j2,5},roll_ball_SE);
+    end
+
+    tax{j2,5} = normData(tax{j2,5},'Method','linear_unit_range','Array',true,...
+        'SetMinMax',[0, 1]);
+    
+    % Filter and normalize gmp
+    gmp{j2,2} = mat2gray(gmp{j2,2}(:,:,1),[0,65535]);
+    gmp{j2,5} = imfilter(invertContrast(gmp{j2,2}),W, 'symmetric'); % low-pass filter to remove high frequency noise
+    if false%SaveImage
+        gmp{j2,5} = imtophat(gmp{j2,5},roll_ball_SE);
+    end
+
+    gmp{j2,5} = normData(gmp{j2,5},'Method','linear_unit_range','Array',true,...
+        'SetMinMax',[0, 1]);
+    
+    if SaveImage
+        % Save RGB and grayscale images of tax and gmp
+        rgb = pk_ternaryimage({tax{j2,5},zeros(size(TMR{j2,5})),gmp{j2,5}},[1:1:3],hist_sat,Mag_cmap,Gr_cmap,Bl_cmap);
+        imwrite(rgb, fullfile(SaveDir, ...
+                                    ['MT_' tax{j2,1}(1:end-4) '_RGB.tiff']),'tiff');
+
+        rgb2 = pk_ternaryimage({tax{j2,5},TMR{j2,5},gmp{j2,5}},[1:1:3],hist_sat,Mag_cmap,Gr_cmap,Bl_cmap);
+        imwrite(rgb2, fullfile(SaveDir, ....
+                                    ['RGB_' tax{j2,1}(1:end-4) '_RGB.tiff']),'tiff');
+
+        % Save tax rgb
+        tax_rgb = pk_applycolourmap(tax{j2,5},pk_cmap('L1'));
+            imwrite(tax_rgb, fullfile(SaveDir, 'tax_gray', ....
+                                    ['tax_' tax{j2,1}(1:end-4) '_gray.tiff']),'tiff');
+        
+        % Save gmp rgb
+        gmp_rgb = pk_applycolourmap(gmp{j2,5},pk_cmap('L1'));
+            imwrite(gmp_rgb, fullfile(SaveDir, 'gmp_gray', ...
+                                    ['gmp_' tax{j2,1}(1:end-4) '_gray.tiff']),'tiff');
+    end
+end
+
+% Normalize MT channel and convert to double.
+% Also, ensure that input tax-gmp images uniform (channel number, etc.)
+for j2 = 1:size(TMR,1)
+    % Convert tax to double and normalize 0-1
+    tax{j2,2} = imProc(tax{j2,2});
+    
+    if median(tax{j2,2}(:))>0.5 % one channel means that only the Bkgd probabilities were loaded.
+        tax{j2,2} = invertContrast(double(tax{j2,2})); % Invert contrast preserving the dynamic range
+    end
+    
+    % Convert gmp to double and normalize 0-1
+    gmp{j2,2} = imProc(gmp{j2,2});
+    if median(gmp{j2,2}(:))>0.5
+        gmp{j2,2} = invertContrast(double(gmp{j2,2}));
+    end
+%     figure, imagesc(gmp{j2,2});
+end
+
+% threshold all images
+OverlapSum      = nan(size(TMR,1),1); % allocate variable to store overlapping pixel information
+tax_regProps	= cell(size(TMR,1),1);
+gmp_regProps    = cell(size(TMR,1),1);
+remove_tax_label= cell(size(TMR,1),1);
+remove_gmp_label= cell(size(TMR,1),1);
+
+% Loop over all images
+for k1 = 1:size(TMR,1)    
+    % Threshold image using specified method
+    switch lower(ThreshMethod)
+        case 'minmax' % Implements Danuser lab MinMax thresholding (default)
+            showPlots = false; % default
+            noisy = 0; % fill holes
+            % threshold tax
+                level       = thresholdFluorescenceImage(tax{k1,2}, showPlots, noisy);
+                tax{k1,4}   = im2bw(tax{k1,2},level); % Create column with the thresholded mask
+            % threshold gmp
+                level       = thresholdFluorescenceImage(gmp{k1,2}, showPlots, noisy);
+                gmp{k1,4}   = im2bw(gmp{k1,2},level); % Create column with the thresholded mask
+        case 'otsu'
+            % threshold tax
+                [~, tax{k1,4}] = thresholdOtsu(tax{k1,2},0);
+            % threshold gmp
+                [~, gmp{k1,4}] = thresholdOtsu(gmp{k1,2},0);
+        case 'rosin'
+            % threshold tax
+                level       = thresholdRosin(tax{k1,2},0);
+                tax{k1,4}   = im2bw(tax{k1,2},level);
+            % threshold gmp
+                level       = thresholdRosin(gmp{k1,2},0);
+                gmp{k1,4}   = im2bw(gmp{k1,2},level);
+    end
+    
+    % Fill holes
+    tax{k1,4} = imfill(tax{k1,4},'holes');
+    gmp{k1,4} = imfill(gmp{k1,4},'holes');
+    
+    % Remove isolated pixels from thresholded image
+    tax{k1,4} = bwmorph(tax{k1,4}, 'clean');
+    gmp{k1,4} = bwmorph(gmp{k1,4}, 'clean');
+    
+    
+    % Merge adjacent MT fragments with imclose and a larger SE
+    SE = strel('disk',3); % merge objects within x pixels. NOTE: This may merge two MT that are close but different. This will be fixed in the next step
+    tax{k1,4} = imclose(tax{k1,4}, SE);
+    gmp{k1,4} = imclose(gmp{k1,4}, SE);
+    
+    % Perform Multi-scale steerable filtering and NMS segmentation (Danuser) 
+        M = 4; % Order of steerable filter (4 = ridge; 3/5 = edge)
+        [res1, theta1, ~, ~] = multiscaleSteerableDetector(double(tax{k1,2}), M);
+        [res2, theta2, ~, ~] = multiscaleSteerableDetector(double(gmp{k1,2}), M);
+
+        % Perform proximity-based NMS segmentation from Danuser lab Filament
+        % Analysis package (Liya Ding).
+        PercentOfPixelsNotEdges = 0.9; % Empirically determined by Liya Ding
+        ThresholdRatio = 0.9; % Empirically determined by LD
+        funParams.nofiguredisruption =1;
+        [~, ~, nmsMask_tax]= ...
+            proximityBasedNmsSeg(res1,theta1,funParams,PercentOfPixelsNotEdges,ThresholdRatio);
+        [~, ~, nmsMask_gmp]= ...
+            proximityBasedNmsSeg(res2,theta2,funParams,PercentOfPixelsNotEdges,ThresholdRatio);
+        
+        % Clean up NMS mask
+        nmsMask_tax     = bwmorph(nmsMask_tax,'thin',inf); % Remove pixels to a minimally connected stroke
+            nmsMask_gmp = bwmorph(nmsMask_gmp,'thin',inf);
+            
+        nmsMask_tax     = bwmorph(nmsMask_tax,'spur',1); % Remove endpoints of lines
+            nmsMask_gmp = bwmorph(nmsMask_gmp,'spur',1); % Remove endpoints of lines
+        
+        SE1 = [0,0,0;0,1,0;0,0,0];
+        SE2 = [1,1,1;1,0,1;1,1,1];
+        
+        nmsMask_tax2     = bwhitmiss(nmsMask_tax,SE1,SE2); % Remove isolated spots
+            nmsMask_gmp2 = bwhitmiss(nmsMask_gmp,SE1,SE2); % Remove isolated spots
+        
+        nmsMask_tax      = nmsMask_tax - nmsMask_tax2;
+            nmsMask_gmp  = nmsMask_gmp - nmsMask_gmp2;
+        
+        nmsMask_tax      = nmsMask_tax & tax{k1,4};
+            nmsMask_gmp  = nmsMask_gmp & gmp{k1,4};
+        
+        % Intensity based watershed transform to separate adjacent microtubules
+            % Compute the distance transform of the binary nmsMask
+            D_tax = bwdist(~tax{k1,4});
+                D_gmp = bwdist(~gmp{k1,4});
+            % Invert D to form basins
+            D_tax = invertContrast(D_tax);
+                D_gmp = invertContrast(D_gmp);
+            % Impose minima at nmsMask
+            D_tax = imimposemin(D_tax,nmsMask_tax);
+                D_gmp = imimposemin(D_gmp,nmsMask_gmp);
+            % Compute the watershed transform
+            L_tax = watershed(D_tax);
+                L_gmp = watershed(D_gmp);
+            % Find the separation lines (where L ==0)
+            W_tax = L_tax==0;
+                W_gmp = L_gmp==0;
+            
+            % Make separation lines equal 0 in mask
+            tax{k1,4}(W_tax) =0;
+            gmp{k1,4}(W_gmp) =0;
+        
+    % Exclude overlapping microtubule regions
+    SE          = strel('disk',3);
+    Overlap     = imdilate(tax{k1,4},SE) & imdilate(gmp{k1,4},SE); 
+    tax{k1,4}   = and(tax{k1,4},~Overlap); % remove overlaps from tax
+    gmp{k1,4}   = and(gmp{k1,4},~Overlap); % remove overlaps from gmp
+    OverlapSum(k1) = sum(Overlap(:)); % sum the number of overlapping pixels
+    
+    % Remove isolated pixels from thresholded image
+    tax{k1,4}   = bwmorph(tax{k1,4}, 'clean');
+    gmp{k1,4}   = bwmorph(gmp{k1,4}, 'clean');
+    
+    % bwareaopen to remove objects less than size minSize
+    minSize     = p.MIN_SIZE;
+    tax{k1,4}   = bwareaopen(tax{k1,4}, minSize);
+    gmp{k1,4}   = bwareaopen(gmp{k1,4}, minSize);
+    
+    % regionprops to remove objects with defined properties
+        % get regionprops
+        tax_regProps = regionprops(tax{k1,4},tax{k1,2},regPropText{:});
+        if ~isempty(tax_regProps)
+            % compute aspect ratio
+            temp_tax = num2cell([tax_regProps.MajorAxisLength]'./[tax_regProps.MinorAxisLength]',2);
+                [tax_regProps.AspectRatio] = deal(temp_tax{:});
+                
+            % compute roundness metric (1 = circle; 0 = non-circle)
+            temp_tax = num2cell(4*pi*[tax_regProps.Area]'./(([tax_regProps.Perimeter]').^2),2);
+                [tax_regProps.Roundness] = deal(temp_tax{:});
+                
+            % Exclude MT classified as abnormal by scoreSVMModel (0 = normal; 1 = remove)
+            tax_regProps = struct2dataset(tax_regProps);
+            if Train
+                tax_Y_hat = zeros(size(tax_regProps,1),1); % Do not remove any if training
+            else
+                [tax_Y_hat, ~] = predict(scoreSVMModel,double(tax_regProps));
+            end
+                
+            % compute the label matrix
+            L_tax = bwlabel(tax{k1,4});
+            % Exlude microtubules classified as abnormal
+            L_tax(ismember(L_tax,find(tax_Y_hat))) =0;
+            % Assign final mask
+            tax{k1,4} = L_tax;
+        else
+            % Assign final mask
+            tax{k1,4} = tax{k1,4}; % Mask is empty
+        end
+                
+        % get regionprops
+        gmp_regProps = regionprops(gmp{k1,4},tax{k1,2},regPropText{:});
+        if ~isempty(gmp_regProps)            
+            % compute aspect ratio
+            temp_gmp = num2cell([gmp_regProps.MajorAxisLength]'./[gmp_regProps.MinorAxisLength]',2);
+                [gmp_regProps.AspectRatio] = deal(temp_gmp{:});
+                
+            % compute roundness metric (1 = circle; 0 = non-circle)
+            temp_gmp = num2cell(4*pi*[gmp_regProps.Area]'./(([gmp_regProps.Perimeter]').^2),2);
+                [gmp_regProps.Roundness] = deal(temp_gmp{:});
+                
+            % Exclude MT classified as abnormal by scoreSVMModel (0 = normal; 1 = remove)
+            gmp_regProps = struct2dataset(gmp_regProps);
+            if Train
+                gmp_Y_hat = zeros(size(gmp_regProps,1),1); % Do not remove any if training
+            else
+                [gmp_Y_hat, ~] = predict(scoreSVMModel,double(gmp_regProps));
+            end
+            
+            % compute the label matrix
+            L_gmp = bwlabel(gmp{k1,4});
+            % Exlude microtubules classified as abnormal
+            L_gmp(ismember(L_gmp,find(gmp_Y_hat))) =0;
+            % Assign final mask
+            gmp{k1,4} = L_gmp;
+        else
+            % Assign final mask
+            gmp{k1,4} = gmp{k1,4}; % Mask is empty
+        end
+        
+    if Train    
+        % Refine microtubule mask--for use in training mach learning
+        tax{k1,4} = refineMask(tax{k1,2},tax{k1,4},'Method','exclude');
+        gmp{k1,4} = refineMask(gmp{k1,2},gmp{k1,4},'Method','exclude');
+
+        % microtubules removed from mask are class 1, non-removed class 0.
+        % --for use in training mach learning
+        removed_MT_tax       = unique(L_tax(xor(L_tax>0, tax{k1,4})));
+        remove_tax_label{k1} = zeros(size(tax_regProps{k1,1},1),1);
+            remove_tax_label{k1}(removed_MT_tax) = 1;
+            
+        removed_MT_gmp       = unique(L_gmp(xor(L_gmp>0, gmp{k1,4})));
+        remove_gmp_label{k1} = zeros(size(gmp_regProps{k1,1},1),1);
+            remove_gmp_label{k1}(removed_MT_gmp) = 1;
+    end
+    
+    
+    % Active contour segmentation on images with masked regions
+    if p.ACTIVE_CONTOUR
+        iter          = 20;
+        contourMethod = 'Chan-Vese';
+        if any(tax{k1,4}(:))
+            tax{k1,4} = activecontour(im2uint8(tax{k1,4}),tax{k1,4}, iter, contourMethod);
+        end
+
+        if any(gmp{k1,4}(:))
+            gmp{k1,4} = activecontour(im2uint8(gmp{k1,4}),gmp{k1,4}, iter, contourMethod);        
+        end
+    end
+
+    % Final step to remove noise/ small isolated pixels
+        % bwareaopen to remove objects less than size minSize
+        tax{k1,4} = bwareaopen(tax{k1,4}, minSize);
+        gmp{k1,4} = bwareaopen(gmp{k1,4}, minSize);
+        
+        % Remove overlapping microtubules
+        Overlap = imdilate(tax{k1,4},SE) & imdilate(gmp{k1,4},SE); 
+        tax{k1,4} = and(tax{k1,4},~Overlap); % remove overlaps from tax
+        gmp{k1,4} = and(gmp{k1,4},~Overlap);
+    
+    if p.CHECK_SEG
+        if ismember(k1,(1:10:size(TMR,1))) % Error check segmentation every 5-10 iterations
+            cd(SaveDir); cd ..; cd .. ;
+            tax_overlay = imoverlay(tax{k1,2},bwperim(tax{k1,4}),[1,0,0]);
+            figure, imagesc(tax_overlay);
+            gmp_overlay = imoverlay(gmp{k1,2},bwperim(gmp{k1,4}),[1,0,0]);
+            figure, imagesc(gmp_overlay)
+        end
+    end
+end
+
+if Train
+    % machine learning to remove small, circular etc microtubules
+    taxFeatures = struct2dataset(vertcat(tax_regProps{:}));
+        remove_tax_label = vertcat(remove_tax_label{:});
+    gmpFeatures = struct2dataset(vertcat(gmp_regProps{:}));
+        remove_gmp_label = vertcat(remove_gmp_label{:});
+end
+        
+% reorganize into a cell array of masks only
+tax_masks = {tax{:,4}}';
+gmp_masks = {gmp{:,4}}';
+
+% save masks
+tax_masks = {tax{:,4}}';
+gmp_masks = {gmp{:,4}}';
+cd(SaveDir);
+save('tax_masks.mat','-mat','tax_masks')
+save('gmp_masks.mat','-mat','gmp_masks')
+
+% get median and mean intensities and tax vs gmp area from regionProps
+tax_MedInt = cell(size(TMR,1),1); % Allocate variables
+    gmp_MedInt = cell(size(TMR,1),1);
+tax_MeanInt = cell(size(TMR,1),1);
+    gmp_MeanInt = cell(size(TMR,1),1);
+norm_tax_Area = cell(size(TMR,1),1); % Allocate variables
+    norm_gmp_Area = cell(size(TMR,1),1);
+Bkgd_MedInt = cell(size(TMR,1),1); % Allocate variables
+    Bkgd_MeanInt = cell(size(TMR,1),1);
+for l1 = 1:size(TMR,1)
+    taxSTATS = regionprops(and(tax{l1,4},~gmp{l1,4}),TMR{l1,5},PROPS);
+        gmpSTATS = regionprops(and(gmp{l1,4},~tax{l1,4}),TMR{l1,5},PROPS);
+    
+    % Calculate median intensity from the raw pixel values
+    tax_MedInt{l1} = cellfun(@median,{taxSTATS.PixelValues}','UniformOutput',true);
+        gmp_MedInt{l1} = cellfun(@median,{gmpSTATS.PixelValues}','UniformOutput',true);
+        
+    % Calculate mean intensity from the raw pixel values
+    tax_MeanInt{l1} = cellfun(@mean,{taxSTATS.PixelValues}','UniformOutput',true);
+        gmp_MeanInt{l1} = cellfun(@mean,{gmpSTATS.PixelValues}','UniformOutput',true);
+        
+    % Calculate mean intensity by field
+    tax_MeanIntField = {taxSTATS.MeanIntensity}'; tax_MeanIntField = cell2mat(tax_MeanIntField); % Area in pixels
+        gmp_MeanIntField = {gmpSTATS.MeanIntensity}'; gmp_MeanIntField = cell2mat(gmp_MeanIntField); % Area in pixels
+        
+    % Determine the fractional area of tax vs gmp in the image
+    tax_Area = {taxSTATS.Area}'; tax_Area = cell2mat(tax_Area); % Area in pixels
+        gmp_Area = {gmpSTATS.Area}'; gmp_Area = cell2mat(gmp_Area); % Area in pixels
+    
+    % Update the totalArea to correct for exluded, overlapping pixels
+    totalArea = imSize - OverlapSum(l1);
+    
+    % Compute the normalized area tax vs gmp using updated totalArea
+    norm_tax_Area{l1} = tax_Area./totalArea; 
+    norm_gmp_Area{l1} = gmp_Area./totalArea;
+    
+    % Calculate background intensity
+    SE = strel('disk',2);
+    Bkgd = imdilate(and(~tax{l1,4},~gmp{l1,4}),SE);
+    BkgdSTATS = regionprops(Bkgd,TMR{l1,5},PROPS);
+    Bkgd_MedInt{l1} = cellfun(@median,{BkgdSTATS.PixelValues}','UniformOutput',true);
+        Bkgd_MeanInt{l1} = cellfun(@mean,{BkgdSTATS.PixelValues}','UniformOutput',true);
+end
+
+% Convert cell arrays of Areas to matrices
+norm_tax_Area = cellfun(@sum,norm_tax_Area,'UniformOutput',true);
+norm_gmp_Area = cellfun(@sum,norm_gmp_Area,'UniformOutput',true);
+
+% Save norm_Area
+save(fullfile(SaveDir, 'norm_tax_Area.mat'),'-mat','norm_tax_Area');
+save(fullfile(SaveDir, 'norm_gmp_Area.mat'),'-mat','norm_gmp_Area');
+
+csvwrite(fullfile(SaveDir, 'norm_tax_Area.csv'), norm_tax_Area);
+csvwrite(fullfile(SaveDir, 'norm_gmp_Area.csv'), norm_gmp_Area);
+
+% Convert cell arrays of MedInt to matrices
+tax_MedInt = vertcat(tax_MedInt{:});
+gmp_MedInt = vertcat(gmp_MedInt{:});
+Bkgd_MedInt = vertcat(Bkgd_MedInt{:});
+    [Bkgd_MedInt_CI, Bkgd_MedInt_S] = bootStrapMean(Bkgd_MedInt(Bkgd_MedInt >0),0.0000005,1000);
+    Bkgd_MedIntPlot = [Bkgd_MedInt_CI(1) Bkgd_MedInt_CI(2)...
+         Bkgd_MedInt_CI(2) Bkgd_MedInt_CI(1)]; % 2D polygon specifying 95% CI of background intensity
+     
+% Convert cell arrays of MeanInt to matrices
+tax_MeanInt = vertcat(tax_MeanInt{:});
+gmp_MeanInt = vertcat(gmp_MeanInt{:});
+Bkgd_MeanInt = vertcat(Bkgd_MeanInt{:});
+    [Bkgd_MeanInt_CI, Bkgd_MeanInt_S] = bootStrapMean(Bkgd_MedInt(Bkgd_MeanInt >0),0.05,1000);
+    Bkgd_MeanIntPlot = [Bkgd_MeanInt_CI(1) Bkgd_MeanInt_CI(2)...
+         Bkgd_MeanInt_CI(2) Bkgd_MeanInt_CI(1)]; % 2D polygon specifying 95% CI of background intensity
+
+     
+% Plot a histogram of the frational area tax vs gmp
+figure(1);
+h1 = histogram(norm_tax_Area,'Normalization','pdf'); % Plot tax
+hold on, histogram(norm_gmp_Area,'Normalization','pdf'); % Plot gmp
+legend('Tax','GMPcPP');
+xlabel('Fraction of image area analyzed');
+ylabel('Normalized PDF');
+cd(SaveDir); % make SaveDir current directory
+savefig(gcf,'hist_Fraction of image area analyzed');
+save(fullfile(SaveDir, 'norm_tax_Area.mat'),'norm_tax_Area');
+save(fullfile(SaveDir, 'norm_gmp_Area.mat'),'norm_gmp_Area');
+close(1)
+
+% Plot a boxplot of the median intensities
+figure(1); hold on;
+fill([0 0 2.5 2.5],Bkgd_MedIntPlot,BkgdColor); 
+nRows = max(numel(tax_MedInt),numel(gmp_MedInt)); % Find max nRows required in combined dataset
+medData = nan(nRows,2);
+medData(1:numel(gmp_MedInt),1) = gmp_MedInt; % First colum is GMPcPP(aka gmp)
+medData(1:numel(tax_MedInt),2) = tax_MedInt; % Second colum is Tax
+b1 = boxplot(medData,'plotstyle','traditional','medianstyle','line',...
+    'notch','off','outliersize',0.01,'symbol','r');
+ylabel('Median TMR intensity per microtubule');
+ylim([0,1]);
+set(gca,'XTickLabel',{'GMPcPP','Tax'});
+savefig(gcf,'box_tax-gmp_med_intensity');
+save('MedianIntensity_gmp_tax.mat','medData');
+close(1)
+    
+% Plot a boxplot of the mean intensities
+figure(1); hold on;
+fill([0 0 2.5 2.5],Bkgd_MeanIntPlot,BkgdColor); 
+meanData = nan(nRows,2);
+meanData(1:numel(gmp_MeanInt),1) = gmp_MeanInt; % First colum is GMPcPP(aka gmp)
+meanData(1:numel(tax_MeanInt),2) = tax_MeanInt; % Second colum is Tax
+b1 = boxplot(meanData,'plotstyle','traditional','medianstyle','line',...
+    'notch','off','outliersize',0.01,'symbol','r'); % Default outlier symbol is 'r+'. If the symbol is omitted, outliers are invisible.
+ylabel('Mean TMR intensity per microtubule');
+ylim([0,1]);
+set(gca,'XTickLabel',{'GMPcPP','Tax'});
+savefig(gcf,'box_tax-gmp_mean_intensity');
+save('MeanIntensity_gmp_tax.mat','meanData');
+close(1)
+
+% Graph data on a Q-Q plot
+figure(1);
+h1 = normplot(gmp_MedInt); xlabel('Data-median intensity gmp tubulin');
+savefig(gcf,'normplot_gmp_med_intensity');
+figure(2)
+h2 = normplot(tax_MedInt); xlabel('Data-median intensity tax tubulin');
+savefig(gcf,'normplot_tax_med_intensity');
+
+close 1 2
+
+% Compute statistics
+[P,ANOVATAB,STATS] = kruskalwallis(medData);
+figure(2), ylabel('Median TMR intensity per microtubule'); set(gca,'XTickLabel',{'GMPcPP','Tax'});
+savefig(1,'KruskalWallis_STATS');
+savefig(2,'KruskalWallis_boxplot');
+close 1 2
+
+end
+
+
+function [p]        = errorCheck(varargin)
+% Subfunction to check for input errors
+
+% Input validation functions
+validateNUMERIC     = @(x) all([isscalar(x), isnumeric(x)]);
+
+% Region props for microtubule SVM classifier
+region_props_text   = {'Area','Eccentricity','MinorAxisLength',...
+                        'MajorAxisLength','Perimeter','Solidity'};
+% Region props to measure for each microtubule
+props_to_measure    = {'MeanIntensity','PixelValues','Area'};
+
+% Parse inputs
+ip = inputParser;
+ip.CaseSensitive    = false;
+ip.addParameter('MAIN_PATH', '', @ischar);
+ip.addParameter('SAVE_PATH', '', @ischar);
+ip.addParameter('TRAIN', false,  @islogical); % Set to true for manual training of MT segmentation model
+ip.addParameter('ACTIVE_CONTOUR', true,  @islogical); 
+ip.addParameter('CHECK_SEG', true,  @islogical); 
+ip.addParameter('SAVE_IMAGE', true,  @islogical); 
+ip.addParameter('REG_PROPS', region_props_text,  @iscell); 
+ip.addParameter('HIST_SAT', 0.25,  validateNUMERIC);
+ip.addParameter('FILE_TYPE', '.tiff',  @ischar);
+ip.addParameter('THRESH_METHOD', 'otsu',  @ischar);
+ip.addParameter('MEASURE', props_to_measure,  @iscell);
+ip.addParameter('BKGD_COLOR', [0.6, 0.6, 0.6],  @(x) numel(x)==3);
+ip.addParameter('MIN_SIZE', 20,  validateNUMERIC); % Min size in pixels
+ip.parse(varargin{:});
+p = ip.Results;
+
+% Check package dependencies
+PKG_DEP     = { {'matlab', 'R2015a'}, {'images', '9.3'}, {'stats', '10.1'},...
+              };
+ERROR_MSG   = { 'MATLAB %s or higher is required.',...
+                'Image Processing Toolbox %s or higher is required.',...
+                'Statistics and Machine Learning Toolbox %s or higher is required.',...
+                'Signal Processing Toolbox %s or higher is required.'};
+for idx      = 1:numel(PKG_DEP)
+    if verLessThan(PKG_DEP{idx}{:})
+        error(ERROR_MSG{idx},PKG_DEP{idx}{2});
+    end
+end
+
+% Check custom function dependencies
+REQ_FUN = {'bootStrapMean','imProc', 'thresholdOtsu','otsuthresh',...
+            'proximityBasedNmsSeg','nonMaximumSuppression',...
+            'invertContrast', 'thresholdFluorescenceImage', ...
+            'thresholdRosin',...
+            }; % Check for required M-Files (names in cell array)
+REQ_FUN_PATH = cell(numel(REQ_FUN),1);
+for a1 = 1:numel(REQ_FUN)
+    if ~isempty(REQ_FUN{a1})
+        REQ_FUN_PATH{a1} = which(REQ_FUN{a1});
+        if isempty(REQ_FUN_PATH{a1})
+            error([REQ_FUN_PATH{a1} '.m is a required function.']);
+        end
+    end
+end
+
+% Get the main directory for a single condition
+if ~exist(p.MAIN_PATH,'dir')
+    if ispc
+        home_path   = fullfile(getenv('HOMEDRIVE'), getenv('HOMEPATH'),'Documents','MATLAB');
+    else
+        home_path   = fullfile(getenv('HOME'),'Documents','MATLB');
+        ui_text     = 'Please select the folder above the folders for a single experiment.';
+    end
+    p.MAIN_PATH     = uigetdir(home_path, ui_text); 
+    if MainPath==0
+        error('Please select a valid directory!')
+    end
+end
+
+% Set the save path within MainPath
+p.SAVE_PATH         = fullfile(p.MAIN_PATH, 'Composite', 'Analysis');
+
+% Load SVM classifier model for microtubules
+% The model was trained using manual human annotations on 944 examples, the
+% remaining 300 examples were used for testing.
+% 95% AUC   7% MCR  92% correct on test set) 
+if exist('scoreSVMModel_1244.mat','file')==2
+    p.SVM           = load('scoreSVMModel_1244.mat');
+else
+    if ispc
+        home_path   = fullfile(getenv('HOMEDRIVE'), getenv('HOMEPATH'),'Documents','MATLAB');
+    else
+        home_path   = fullfile(getenv('HOME'),'Documents','MATLB');
+        ui_text     = 'Please select the microtubule SVM classifier titled ''scoreSVMModel_1244.mat''.';
+    end
+    
+    [filename, pathname] = uigetfile('*.mat', ui_text);
+    if isequal(filename,0) || isequal(pathname,0)
+       error('User cancelled while loading the SVM microtubule classifier.')
+    else
+       p.SVM        = load(fullfile(PATHNAME, FILENAME));
+    end
+end
+
+end

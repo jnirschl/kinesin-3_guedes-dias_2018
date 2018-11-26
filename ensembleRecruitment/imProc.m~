@@ -1,0 +1,93 @@
+function [Im, ToInputClass] = imProc(Im_in,varargin)
+% [Im, ToInputClass] = imProc(Im_in,varargin);
+% IMPROC is a function that accepts an input image and returns a
+% normalized image of class double as well as an anonymous function handle
+% to revert the processed image to the original input class.
+% Input:    Im_in
+% Optional: 'Method' 1- convert to single; 2-convert to double (default)
+%
+% Output:   Im
+%           ToInputClass
+%
+% Example
+% >> Im_in = imread('rice.png');
+% >> [Im ToInputClass] = imProc(Im_in);
+% >> class(Im)
+% ans = 
+%       double
+% >> max(Im(:)), min(Im(:))
+% ans = 
+%       1
+% ans = 
+%       0
+% >> ToInputClass
+% ans = 
+%       @im2uint8
+% 
+% Author: Jeffrey J. Nirschl, Holzbaur Lab (University of Pennsylvania)
+% Date created: 10/16/2014
+% Distributable under BSD liscence. 
+% Copyright (c) 2015 Jeffrey J. Nirschl
+% All rights reserved.
+% Last modified: 11/30/2015
+
+
+% Error checking
+low_in = 1; high_in= 3; % Set range of acceptable input arguments
+low_out = 0; high_out= 2; % Set range of acceptable output arguments
+narginchk(low_in,high_in);
+nargoutchk(low_out,high_out);
+clear low_in high_in low_out high_out;
+
+% Check function dependencies
+REQ_FUN = {'normData'}; % Check for required M-Files
+REQ_FUN_PATH = cell(numel(REQ_FUN),1);
+for a1 = 1:numel(REQ_FUN)
+    REQ_FUN_PATH{a1} = which(REQ_FUN{a1});
+    if isempty(REQ_FUN_PATH{a1})
+        error([REQ_FUN_PATH{a1} '.m is a required function.']);
+    end
+end
+
+% Parse inputs and initialize variables
+ip = inputParser;
+ip.CaseSensitive = false;
+ip.addRequired('Im');
+ip.addParameter('Method',2,@isnumeric); % Input 2 for conversion to double; 1 = conversion to single; 
+ip.addParameter('NormInterval',[0, 1],@isvector); % Vector of the range of output values for the normalized data
+ip.parse(Im_in,varargin{:});
+p = ip.Results;
+
+% Validate image attributes
+validateattributes(Im_in,{'numeric'},{'nonsparse','nonempty'});
+
+% Initialize variables
+InputClass = class(Im_in);
+
+% Determine input class
+switch InputClass
+    case 'uint8'
+        ToInputClass = @im2uint8;
+    case 'uint16'
+        ToInputClass = @im2uint16;
+    case 'int16'
+        ToInputClass = @im2int16;
+    case 'single'
+        ToInputClass = @im2single;
+    case 'double'
+        ToInputClass = @im2double;
+end
+
+% Normalize to [0 1] and convert to single or double
+Im = zeros(size(Im_in)); % Allocate variable
+for Dim = 1: size(Im_in,3)
+    Im(:,:,Dim) = normData(Im_in(:,:,Dim),'Array',true,'METHOD','linear_custom_range',...
+        'NormInterval',p.NormInterval);
+end
+
+if p.Method ==1;
+    Im = single(Im);
+end
+
+end
+

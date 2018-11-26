@@ -5,12 +5,19 @@
 ------------------
 ## Contents
 * [Installation](#installation)
+* [Files](#files)
 * [License and citation](#license-and-citation)
 * [Acknowledgements](#acknowledgements)
 
 ------------------
+## Files
+* [ensembleRecruitment](ensembleRecruitment)
+* [kymoSuite](kymoSuite)
+* [nearestPresynapticDistance](nearestPresynapticDistance)
+
+------------------
 ## Installation
-These scripts use the MATLAB (R) programming language and environment. To begin using these scripts, simply add the files to the MATLAB path using the "Set Path" dialog box or the `addpath` function. Previous experience with MATLAB (R) or another programming language is required for appropriate use of these scripts.
+These scripts use the MATLAB (R) programming language and environment. To begin using these scripts, simply add the files to the MATLAB path using the "Set Path" dialog box or the `addpath` function. Previous experience with MATLAB (R) or another programming language is required for efficient use of these scripts.
 
 ### System requirements
 

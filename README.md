@@ -38,12 +38,13 @@ The following MATLAB (R) Toolboxes are required: Image Processing Toolbox, Stati
 These scripts are released under the [MIT License](https://opensource.org/licenses/MIT).
 
 If you use use this code in your research, please cite:
-Guedes-Dias P, Nirschl JJ, Abreu N, Tokito MK, Magiera MM, Janke C, and Holzbaur ELF. Kinesin-3 responds to local microtubule dynamics to target synaptic cargo delivery to the presynapse. Current Biology. 2018.
+
+Guedes-Dias, P., Nirschl, J.J., Abreu, N., Tokito, M.K., Janke, C., Magiera, M.M., and Holzbaur, E.L.F. (2019). Kinesin-3 Responds to Local Microtubule Dynamics to Target Synaptic Cargo Delivery to the Presynapse. Current Biology.
+[**DOI**: https://doi.org/10.1016/j.cub.2018.11.065](https://doi.org/10.1016/j.cub.2018.11.065)
 
 Bibtex formatted reference:
 ```text
 @article{Guedes-Dias2019,
-    abstract = {Neurons in the CNS establish thousands of en passant synapses along their axons. Robust neurotransmission depends on the replenishment of synaptic components in a spatially precise manner. Using live-cell microscopy and single-molecule reconstitution assays, we find that the delivery of synaptic vesicle precursors (SVPs) to en passant synapses in hippocampal neurons is specified by an interplay between the kinesin-3 KIF1A motor and presynaptic microtubules. Presynaptic sites are hotspots of dynamic microtubules rich in GTP-tubulin. KIF1A binds more weakly to GTP-tubulin than GDP-tubulin and competes with end-binding (EB) proteins for binding to the microtubule plus end. A disease-causing mutation within KIF1A that reduces preferential binding to GDP- versus GTP-rich microtubules disrupts SVP delivery and reduces presynaptic release upon neuronal stimulation. Thus, the localized enrichment of dynamic microtubules along the axon specifies a localized unloading zone that ensures the accurate delivery of SVPs, controlling presynaptic strength in hippocampal neurons.},
     annote = {doi: 10.1016/j.cub.2018.11.065},
     author = {Guedes-Dias, Pedro and Nirschl, Jeffrey J and Abreu, Nohely and Tokito, Mariko K and Janke, Carsten and Magiera, Maria M and Holzbaur, Erika L F},
     doi = {10.1016/j.cub.2018.11.065},

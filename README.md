@@ -30,7 +30,7 @@ These scripts use the MATLAB (R) programming language and environment. To begin 
 **Minimal system requirements for using these scripts.** This does not include hard-drive space required for additional software packages or dependencies.
 
 ### Dependencies
-The following MATLAB (R) Toolboxes are required: Image Processing Toolbox, Statistics and Machine Learning Toolbox, and Signal Processing Toolbox. Additional dependencies include [uTrack (Danuser lab)](https://www.utsouthwestern.edu/labs/danuser/software/#utrack_anc), [Bioformats](https://docs.openmicroscopy.org/bio-formats/5.9.2/users/matlab/), and [MATLAB Central](https://www.mathworks.com/matlabcentral/) files where listed.
+The following MATLAB (R) Toolboxes are required: Image Processing Toolbox, Statistics and Machine Learning Toolbox, and Signal Processing Toolbox. Additional dependencies include some functions from [uTrack (Danuser lab)](https://www.utsouthwestern.edu/labs/danuser/software/#utrack_anc), [Bioformats](https://docs.openmicroscopy.org/bio-formats/5.9.2/users/matlab/), and [MATLAB Central](https://www.mathworks.com/matlabcentral/) files where listed.
 
 
 ------------------

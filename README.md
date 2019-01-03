@@ -1,6 +1,6 @@
 # Supplemental code for "Kinesin-3 responds to local microtubule dynamics to target synaptic cargo delivery to the presynapse"
 
-[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](TODO--add_url/blob/master/LICENSE) [![DOI](https://zenodo.org/badge/doi/10.1016/j.cub.2018.11.065/zenodo.00000.svg)](http://dx.doi.org/10.1016/j.cub.2018.11.065)
+[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](TODO--add_url/blob/master/LICENSE) [![DOI](https://zenodo.org/badge/159114438.svg)](https://zenodo.org/badge/latestdoi/159114438)
 
 ------------------
 ## Contents
@@ -43,17 +43,17 @@ Guedes-Dias P, Nirschl JJ, Abreu N, Tokito MK, Magiera MM, Janke C, and Holzbaur
 Bibtex formatted reference:
 ```text
 @article{Guedes-Dias2019,
-abstract = {Neurons in the CNS establish thousands of en passant synapses along their axons. Robust neurotransmission depends on the replenishment of synaptic components in a spatially precise manner. Using live-cell microscopy and single-molecule reconstitution assays, we find that the delivery of synaptic vesicle precursors (SVPs) to en passant synapses in hippocampal neurons is specified by an interplay between the kinesin-3 KIF1A motor and presynaptic microtubules. Presynaptic sites are hotspots of dynamic microtubules rich in GTP-tubulin. KIF1A binds more weakly to GTP-tubulin than GDP-tubulin and competes with end-binding (EB) proteins for binding to the microtubule plus end. A disease-causing mutation within KIF1A that reduces preferential binding to GDP- versus GTP-rich microtubules disrupts SVP delivery and reduces presynaptic release upon neuronal stimulation. Thus, the localized enrichment of dynamic microtubules along the axon specifies a localized unloading zone that ensures the accurate delivery of SVPs, controlling presynaptic strength in hippocampal neurons.},
-annote = {doi: 10.1016/j.cub.2018.11.065},
-author = {Guedes-Dias, Pedro and Nirschl, Jeffrey J and Abreu, Nohely and Tokito, Mariko K and Janke, Carsten and Magiera, Maria M and Holzbaur, Erika L F},
-doi = {10.1016/j.cub.2018.11.065},
-issn = {0960-9822},
-journal = {Current Biology},
-month = {jan},
-publisher = {Elsevier},
-title = {{Kinesin-3 Responds to Local Microtubule Dynamics to Target Synaptic Cargo Delivery to the Presynapse}},
-url = {https://doi.org/10.1016/j.cub.2018.11.065},
-year = {2019}
+    abstract = {Neurons in the CNS establish thousands of en passant synapses along their axons. Robust neurotransmission depends on the replenishment of synaptic components in a spatially precise manner. Using live-cell microscopy and single-molecule reconstitution assays, we find that the delivery of synaptic vesicle precursors (SVPs) to en passant synapses in hippocampal neurons is specified by an interplay between the kinesin-3 KIF1A motor and presynaptic microtubules. Presynaptic sites are hotspots of dynamic microtubules rich in GTP-tubulin. KIF1A binds more weakly to GTP-tubulin than GDP-tubulin and competes with end-binding (EB) proteins for binding to the microtubule plus end. A disease-causing mutation within KIF1A that reduces preferential binding to GDP- versus GTP-rich microtubules disrupts SVP delivery and reduces presynaptic release upon neuronal stimulation. Thus, the localized enrichment of dynamic microtubules along the axon specifies a localized unloading zone that ensures the accurate delivery of SVPs, controlling presynaptic strength in hippocampal neurons.},
+    annote = {doi: 10.1016/j.cub.2018.11.065},
+    author = {Guedes-Dias, Pedro and Nirschl, Jeffrey J and Abreu, Nohely and Tokito, Mariko K and Janke, Carsten and Magiera, Maria M and Holzbaur, Erika L F},
+    doi = {10.1016/j.cub.2018.11.065},
+    issn = {0960-9822},
+    journal = {Current Biology},
+    month = {jan},
+    publisher = {Elsevier},
+    title = {{Kinesin-3 Responds to Local Microtubule Dynamics to Target Synaptic Cargo Delivery to the Presynapse}},
+    url = {https://doi.org/10.1016/j.cub.2018.11.065},
+    year = {2019}
 }
 ```
 

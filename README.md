@@ -39,13 +39,14 @@ These scripts are released under the [MIT License](https://opensource.org/licens
 
 If you use use this code in your research, please cite:
 
-Guedes-Dias, P., Nirschl, J.J., Abreu, N., Tokito, M.K., Janke, C., Magiera, M.M., and Holzbaur, E.L.F. (2019). Kinesin-3 Responds to Local Microtubule Dynamics to Target Synaptic Cargo Delivery to the Presynapse. Current Biology.
+Guedes-Dias, P., Nirschl, J.J., Abreu, N., Tokito, M.K., Janke, C., Magiera, M.M., and Holzbaur, E.L.F. (2019). Kinesin-3 Responds to Local Microtubule Dynamics to Target Synaptic Cargo Delivery to the Presynapse. Current Biology. 
 
+[**PMID**: https://www.ncbi.nlm.nih.gov/pubmed/30612907](30612907)
 [**DOI**: https://doi.org/10.1016/j.cub.2018.11.065](https://doi.org/10.1016/j.cub.2018.11.065)
 
 Bibtex formatted reference:
 ```text
-@article{Guedes-Dias2019,
+@article{pmid30612907,
     annote = {doi: 10.1016/j.cub.2018.11.065},
     author = {Guedes-Dias, Pedro and Nirschl, Jeffrey J and Abreu, Nohely and Tokito, Mariko K and Janke, Carsten and Magiera, Maria M and Holzbaur, Erika L F},
     doi = {10.1016/j.cub.2018.11.065},

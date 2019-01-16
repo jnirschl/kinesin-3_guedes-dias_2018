@@ -1,6 +1,6 @@
 # Supplemental code for "Kinesin-3 responds to local microtubule dynamics to target synaptic cargo delivery to the presynapse"
 
-[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](TODO--add_url/blob/master/LICENSE) [![DOI](https://zenodo.org/badge/159114438.svg)](https://zenodo.org/badge/latestdoi/159114438)
+[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](./LICENSE) [![DOI](https://zenodo.org/badge/159114438.svg)](https://zenodo.org/badge/latestdoi/159114438)
 
 ------------------
 ## Contents

@@ -175,7 +175,7 @@ for z=1:size(varargin,2)
                             raw{i,j}(:,1)   = groupCell(:,2); % Position or X data
                             raw{i,j}(:,2)   = groupCell(:,1); % Time or Y data
                             
-                            if and(~isempty(raw{i,j}), size(raw{i,j},1) > 2)
+                            if and(~isempty(raw{i,j}), size(raw{i,j},1) >= 2)
                                 interptime  = [raw{i,j}(1,2):1:raw{i,j}(end,2)]'; % Interpolate values of y
                                 interpdist  = interp1(raw{i,j}(:,2),raw{i,j}(:,1),interptime,'linear','extrap');% Interpolate values of x
                             else

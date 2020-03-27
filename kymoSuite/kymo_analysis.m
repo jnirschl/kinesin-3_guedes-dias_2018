@@ -159,7 +159,7 @@ for z=1:size(varargin,2)
             
             
             % Process data. Skip empty columns or columns with less than 2 values
-            if and(isempty(raw{i,j}) == 0, size(raw{i,j},1) > 2)
+            if and(isempty(raw{i,j}) == 0, size(raw{i,j},1) >= 2)
                 try
                     if strcmp(interp_btn,'Yes') ==1; % interpolation may not be required
                         [~, DUP_IDX]= findDuplicates(raw{i,j}(:,2));
